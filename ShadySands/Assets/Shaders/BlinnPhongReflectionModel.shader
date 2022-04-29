@@ -9,7 +9,7 @@ Shader "Blinn–Phong reflection model"
         _BaseMap("Texture", 2D) = "white" {}
         _TintColor("Tint Color", Color) = (1, 1, 1, 1)
         _HighlightColor("Highlight Color", Color) = (1, 1, 1, 1)
-        _Shininess("Shininess", Range(64.0, 1024.0)) = 0.5
+        _Shininess("Shininess", Range(16.0, 128.0)) = 0.5
     }
     SubShader
     {
@@ -52,12 +52,11 @@ Shader "Blinn–Phong reflection model"
             };
             
             
-            vertex_output vertex_shader_main(vertex_input v)
+            vertex_output vertex_shader_main(const vertex_input v)
             {
                 vertex_output result;
                 result.vertex = TransformObjectToHClip(v.position.xyz);
                 result.uv = TRANSFORM_TEX(v.uv, _BaseMap);
-                
                 
                 result.normal_world_space = normalize(TransformObjectToWorldNormal(v.normal));
 
@@ -67,29 +66,52 @@ Shader "Blinn–Phong reflection model"
                 return result;
             }
             
-            
-            float4 fragment_shader_main(vertex_output i) : SV_Target
+
+            float4 ambient_color(const float2 uv)
             {
-                float4 texture_pixel = SAMPLE_TEXTURE2D(_BaseMap, sampler_BaseMap, i.uv);
-                float4 ambient_color = texture_pixel * _TintColor;
+                return _TintColor * SAMPLE_TEXTURE2D(_BaseMap, sampler_BaseMap, uv);
+            }
+
+            float light_intensity(const float3 normal, const float3 light_direction)
+            {
+                return max(dot(normal, light_direction), 0);
+            }
+
+            float4 diffuse_color(
+                const float3 normal,
+                const float3 light_direction,
+                const float4 light_color = float4(1,1,1,1))
+            {
+                float intensity = light_intensity(normal, light_direction);
+                return intensity * light_color;
+            }
+            
+            float4 diffuse_color(
+                const float intensity,
+                const float4 light_color = float4(1,1,1,1))
+            {
+                return intensity * light_color;
+            }
+            
+            float4 fragment_shader_main(const vertex_output i) : SV_Target
+            {
+                float4 ambient = ambient_color(i.uv);
 
                 Light light = GetMainLight();
                 float4 light_color = float4(light.color, 1);
                 float3 light_direction = normalize(light.direction);
 
-                float light_intensity = dot(i.normal_world_space, light.direction);
-                float4 diffuse_color = light_intensity * light_color;;
+                float intensity = light_intensity(i.normal_world_space, light_direction);
+                float4 diffuse = diffuse_color(intensity, light_color);
                 
                 float specular_intensity = 0;
-                light_intensity = max(light_intensity, 0);
-                if (light_intensity > 0)
+                if (intensity > 0)
                 {
                     float3 halfway_vector = normalize(light_direction + i.view_direction);
-                    float t = dot(i.normal_world_space, halfway_vector);
-                    specular_intensity = pow(max(t, 0), _Shininess);
+                    specular_intensity = pow(max(dot(i.normal_world_space, halfway_vector), 0), _Shininess);
                 }
                 
-                return max(ambient_color * light_intensity + specular_intensity * _HighlightColor, ambient_color * diffuse_color);
+                return max(ambient * intensity + specular_intensity * _HighlightColor, ambient * diffuse);
             }
             
             ENDHLSL
