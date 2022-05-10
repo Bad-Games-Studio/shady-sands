@@ -9,7 +9,7 @@ Shader "Blinn–Phong reflection model"
         _BaseMap("Texture", 2D) = "white" {}
         _TintColor("Tint Color", Color) = (1, 1, 1, 1)
         _HighlightColor("Highlight Color", Color) = (1, 1, 1, 1)
-        _Shininess("Shininess", Range(16.0, 128.0)) = 0.5
+        _Shininess("Shininess", Range(16.0, 256.0)) = 16
     }
     SubShader
     {
@@ -108,7 +108,7 @@ Shader "Blinn–Phong reflection model"
                 if (intensity > 0)
                 {
                     float3 halfway_vector = normalize(light_direction + i.view_direction);
-                    specular_intensity = pow(max(dot(i.normal_world_space, halfway_vector), 0), _Shininess);
+                    specular_intensity = pow(max(dot(normalize(i.normal_world_space), halfway_vector), 0), _Shininess);
                 }
                 
                 return max(ambient * intensity + specular_intensity * _HighlightColor, ambient * diffuse);
